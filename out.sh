@@ -1,5 +1,14 @@
+#!/bin/bash
+cd "/home/kyle/coding/controller-ui" || exit
 cargo b -r
 dx bundle --web -r
+
+rm include.rs
+touch include.rs
+
+echo "impl AppBuilder for Application {" >> include.rs
+echo "type PathRouter = impl routing::PathRouter;" >> include.rs
+echo "fn build_app(self) -> picoserve::Router<Self::PathRouter> {" >> include.rs
 
 jq -r '
   .assets.assets 
@@ -19,4 +28,9 @@ jq -r '
     \"assets/\(.css)\",
     \"assets/\(.js)\",
     \"assets/\(.wasm)\"
-)"' /home/kyle/coding/controller-ui/target/dx/controller-ui/release/web/.manifest.json
+)"' /home/kyle/coding/controller-ui/target/dx/controller-ui/release/web/.manifest.json >> include.rs
+
+
+echo ".route(\"/controller\", post(handle_command))" >> include.rs
+echo "}}" >> include.rs
+mv include.rs "/home/kyle/coding/no-std-esp32"
