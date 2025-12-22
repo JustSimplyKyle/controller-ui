@@ -1,11 +1,7 @@
-use std::{
-    fmt::{Display, format},
-    str::FromStr,
-};
+use std::fmt::Display;
 
 use dioxus::{
-    CapturedError,
-    core::{IntoAttributeValue, anyhow, bail},
+    core::{IntoAttributeValue, bail},
     document::eval,
     prelude::*,
 };
@@ -170,24 +166,22 @@ fn Controller() -> Element {
                 }
             }
 
-            // 1. Animated Background Blobs
-            div { class: "absolute top-0 left-0 w-full h-full overflow-hidden" }
 
             div {
-                class: "w-full h-full flex flex-col items-center justify-center gap-8 overflow-auto pt-24 touch-pan-y",
+                class: "w-full h-full flex flex-col items-center justify-start gap-8 touch-pan-y overflow-y-auto",
                 hidden: active_tab() != ActiveTab::Settings,
                 h2 { class: "text-2xl font-light tracking-widest text-white/50 uppercase", "System Settings" }
 
                 div {
-                    class: "w-full max-w-2xl",
+                    class: "w-full max-w-xl",
                     BlinkSlider {}
                 }
                 div {
-                    class: "w-full max-w-2xl",
+                    class: "w-full max-w-xl",
                     PwmSlider {}
                 }
                 div {
-                    class: "w-full max-w-2xl",
+                    class: "w-full max-w-xl",
                     FrequencySlider {}
                 }
 
@@ -602,7 +596,7 @@ fn PwmSlider() -> Element {
             step: 5,
             unit: "%",
             details: "Adjust the PWM duty cycle using percentages",
-            default_value: 75,
+            default_value: 100,
             command_type: "pwm_percentage",
             min: 20,
             max: 100
@@ -666,15 +660,11 @@ fn CustomSlider(
                     oninput: move |evt| {
                         if let Ok(val) = evt.value().parse::<i32>() {
                             blink_len.set(val);
-                        }
-                    },
-                    onchange: move |evt| {
-                        if let Ok(val) = evt.value().parse::<i32>() {
                             spawn(async move {
                                 send_command((&command_type(), &val.to_string())).await;
                             });
                         }
-                    }
+                    },
                 }
 
                 div { class: "flex justify-between text-[10px] font-bold text-white/20 uppercase tracking-tighter",

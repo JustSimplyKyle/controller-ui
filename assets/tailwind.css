@@ -13,6 +13,7 @@
     --color-slate-900: oklch(20.8% 0.042 265.755);
     --color-white: #fff;
     --spacing: 0.25rem;
+    --container-xl: 36rem;
     --container-2xl: 42rem;
     --text-xs: 0.75rem;
     --text-xs--line-height: calc(1 / 0.75);
@@ -198,17 +199,11 @@
   .static {
     position: static;
   }
-  .top-0 {
-    top: calc(var(--spacing) * 0);
-  }
   .top-6 {
     top: calc(var(--spacing) * 6);
   }
   .right-6 {
     right: calc(var(--spacing) * 6);
-  }
-  .left-0 {
-    left: calc(var(--spacing) * 0);
   }
   .left-6 {
     left: calc(var(--spacing) * 6);
@@ -293,8 +288,8 @@
   .w-screen {
     width: 100vw;
   }
-  .max-w-2xl {
-    max-width: var(--container-2xl);
+  .max-w-xl {
+    max-width: var(--container-xl);
   }
   .transform {
     transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
@@ -330,6 +325,9 @@
   .justify-end {
     justify-content: flex-end;
   }
+  .justify-start {
+    justify-content: flex-start;
+  }
   .gap-6 {
     gap: calc(var(--spacing) * 6);
   }
@@ -348,11 +346,11 @@
   .justify-self-start {
     justify-self: flex-start;
   }
-  .overflow-auto {
-    overflow: auto;
-  }
   .overflow-hidden {
     overflow: hidden;
+  }
+  .overflow-y-auto {
+    overflow-y: auto;
   }
   .\!rounded-3xl {
     border-radius: var(--radius-3xl) !important;
