@@ -22,8 +22,19 @@ macro_rules! twnum {
         TailwindNumber::Fraction(($top, $bottom))
     };
 }
+async fn heartbeat() -> bool {
+    let resp = Request::post("/controller")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("cmd=heartbeat")
+        .send()
+        .await;
 
-// --- API Logic (Unchanged) ---
+    match resp {
+        Ok(x) if x.status() == 200 => true,
+        Ok(_) | Err(_) => false,
+    }
+}
+
 async fn send_command((action, status): (&str, &str)) {
     let params = format!("cmd={action}&status={status}");
     let resp = Request::post("/controller")
@@ -60,6 +71,18 @@ const GLOBAL_STYLES: &str = r#"
     .animation-delay-4000 {
         animation-delay: 4s;
     }
+
+    .alert-transition {
+        /* Using the custom linear easing for a snappy, spring-like feel */
+        transition: transform 0.6s var(--quick-easing);
+    }
+    .slide-out {
+        transform: translateX(120%);
+    }
+    .slide-in {
+        transform: translateX(0);
+    }
+
     /* The "Gradient Stroke" effect wrapper */
     .glass-border-gradient {
         background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%);
@@ -130,10 +153,106 @@ fn Controller() -> Element {
         ";
         let _ = eval(js_script);
     };
+    let mut backend_connected = use_signal(|| true);
+
+    // --- Keyboard Control Setup ---
+    use_effect(move || {
+        spawn(async move {
+            let mut eval_result = eval(
+                r#"
+                const keyStates = new Map();
+                
+                const handleKeyDown = (e) => {
+                    const key = e.key.toLowerCase();
+                    
+                    // Only handle our control keys
+                    if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown'].includes(key)) {
+                        e.preventDefault();
+                        
+                        // Only send if not already pressed (prevent key repeat)
+                        if (!keyStates.get(key)) {
+                            keyStates.set(key, true);
+                            dioxus.send(key + ':pressed');
+                        }
+                    }
+                };
+                
+                const handleKeyUp = (e) => {
+                    const key = e.key.toLowerCase();
+                    
+                    if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown'].includes(key)) {
+                        keyStates.delete(key);
+                        dioxus.send(key + ':released');
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyDown);
+                window.addEventListener('keyup', handleKeyUp);
+                
+                return () => {
+                    window.removeEventListener('keydown', handleKeyDown);
+                    window.removeEventListener('keyup', handleKeyUp);
+                };
+            "#,
+            );
+
+            // Handle incoming keyboard events
+            loop {
+                if let Ok(message) = eval_result.recv::<String>().await {
+                    // Parse "key:status" format
+                    if let Some((key, status)) = message.split_once(':') {
+                        let command = match key {
+                            "w" => Some("go_front"),
+                            "s" => Some("go_back"),
+                            "a" => Some("turn_left"),
+                            "d" => Some("turn_right"),
+                            "arrowup" => Some("arm_up"),
+                            "arrowdown" => Some("arm_down"),
+                            "q" => Some("pull_up"),
+                            "e" => Some("pull_down"),
+                            _ => None,
+                        };
+
+                        if let Some(cmd) = command {
+                            send_command((cmd, status)).await;
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // --- NEW: Heartbeat Polling Loop ---
+    use_future(move || async move {
+        loop {
+            // Check heartbeat
+            let status = heartbeat().await;
+
+            backend_connected.set(status);
+
+            gloo_timers::future::TimeoutFuture::new(2000).await;
+        }
+    });
 
     rsx! {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
         style { "{GLOBAL_STYLES}" }
+        div {
+             class: format!(
+                "fixed top-24 right-0 m-6 z-[100] flex items-center gap-4 p-4 rounded-2xl backdrop-blur-xl bg-red-500/15 border border-red-500/30 alert-transition {}",
+                if backend_connected() { "slide-out" } else { "slide-in" }
+            ),            // Pulsing Warning Icon
+            div { class: "relative flex items-center justify-center w-10 h-10 bg-red-500/20 rounded-full",
+                div { class: "absolute w-full h-full bg-red-500 rounded-full animate-ping opacity-75" }
+                span { class: "text-red-500 font-bold text-xl", "!" }
+            }
+
+            // Text Content
+            div {
+                h4 { class: "text-white font-bold", "Connection Lost" }
+                p { class: "text-white/60 text-xs", "Reconnecting to controller..." }
+            }
+        }
 
         // --- Main Container with Big Sur Style Background ---
         div { class: "relative flex not-sm:flex-col items-center justify-between h-screen w-screen overflow-hidden bg-slate-900 gap-10 p-6 sm:px-12 pt-24 touch-none select-none text-white",
@@ -185,6 +304,25 @@ fn Controller() -> Element {
                     FrequencySlider {}
                 }
 
+                div {
+                    class: "w-full max-w-xl",
+                    DelaySlider {}
+                }
+                div {
+                    class: "w-full max-w-xl mt-8",
+
+                    div { class: "glass-border-gradient !rounded-3xl",
+                        div { class: "glass-panel p-8 rounded-3xl",
+                            h3 { class: "text-xl font-bold text-white mb-4", "Keyboard Controls" }
+                            div { class: "grid grid-cols-2 gap-4 text-sm text-white/60",
+                                div { "W/S/A/D" span { class: "text-white/40 ml-2", "→ Movement" } }
+                                div { "Q/E" span { class: "text-white/40 ml-2", "→ Lift" } }
+                                div { "↑/↓" span { class: "text-white/40 ml-2", "→ Arm" } }
+                            }
+                        }
+                    }
+                }
+
                 div { class: "text-center opacity-20 text-xs mt-10",
                     p { "Connected to: robot-controller-v2" }
                     p { "Firmware: 0.0.1-alpha.0" }
@@ -196,6 +334,7 @@ fn Controller() -> Element {
                 onclick: toggle_fullscreen,
                 span { class: "text-white/80 group-hover:text-white font-bold text-lg", "⛶" }
             }
+
 
             div {
                 class: "contents",
@@ -618,6 +757,26 @@ fn FrequencySlider() -> Element {
             details: "A higher frequency produces less hum, but lesser strength",
             default_value: 8000,
             command_type: "frequency_kilohertz",
+            min,
+            max
+        }
+    }
+}
+
+#[component]
+fn DelaySlider() -> Element {
+    let max = 10000;
+    let min = 250;
+    rsx! {
+        CustomSlider {
+            left: "low({min})",
+            right: "high({max})",
+            step: 250,
+            title: "Servo delay",
+            unit: "µs",
+            details: "Adjust the servo delay in microseconds",
+            default_value: 1000,
+            command_type: "servo_delay",
             min,
             max
         }

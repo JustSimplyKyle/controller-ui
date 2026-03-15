@@ -1,9 +1,7 @@
 #!/bin/bash
 cd "/home/kyle/coding/controller-ui" || exit
-cargo b -r
-dx bundle --web -r
+dx bundle -r --debug-symbols false
 
-rm include.rs
 touch include.rs
 
 echo "impl AppBuilder for Application {" >> include.rs

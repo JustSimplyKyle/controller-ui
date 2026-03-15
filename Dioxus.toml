@@ -1,4 +1,6 @@
 [application]
+name = "controller-ui"
+default_platform = "web"
 
 [web.app]
 
@@ -19,3 +21,6 @@ script = []
 # Javascript code file
 # serve: [dev-server] only
 script = []
+
+[web.bundle]
+should_optimize = false
